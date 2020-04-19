@@ -5,16 +5,23 @@ PROTECTOR :
 A Ludum Dare 46 game jam entry.
 
 **THEME :** *KEEP IT ALIVE*
+**Platform : Nintendo Entertainment System \[NES\]**
+**Language : C** *(ASM source were either generated (sounds effects), or are library, i did not write them.)*
 
-**Description of the game :**
+Description:
+============
 
 You are a hero, with your antivirus gun, you must destroy the incoming viruses, survive and protect the nurse in an hospital.
 
-**Platform : Nintendo Entertainment System \[NES\]***
+How to run:
+===========
 
-**Language : C**
+Download .nes ROM. Open it in your favorite NES emulator. 
+I recommend to use [Mesen](https://mesen.ca/) for an optimal experience.
 
-*ASM source were either generated (sounds effects), or are library, i did not write them.*
+If you do not want to install an emulator, you can just go to https://jsnes.org/, then drag and drop the .nes rom on the webpage.
+
+
 
 **Library :**
 
