@@ -17,6 +17,7 @@
 #include "title.h"
 #include "scenario.h"
 #include "instructions.h"
+#include "gameover.h"
 #include "map1.h"
 
 #define PLAYER_ONE 0x00
@@ -124,6 +125,14 @@ static unsigned char uScenarioText[31] ={
 	0,0,0,0,0,
 	0,0,0,0,0,
 	0,0,0,0,0,0,0,
+	NT_UPD_EOF
+};
+
+// Game Over 'HUD' vram update buffer
+static unsigned char uListGameOver[26] ={
+	MSB(NTADR_A(11,14))|NT_UPD_HORZ,LSB(NTADR_A(11,14)),10,  // AT BG position 11,14, UPDATE 10 TILES
+	0x33,0x23,0x2F,0x32,0x25,0x1A,  // 'S' 'C' 'O' 'R' 'E' ':'
+	0x00,0x10,0x10,0x10,            // '0' '0' '0'
 	NT_UPD_EOF
 };
 
@@ -317,6 +326,33 @@ void setGameState(){
 	ppu_on_all();
 }
 
+void setGameOverState(){
+	char scoreboard[10] = {'S','C','O','R','E',':',' ','0','0','0'};
+
+	// Turn off rendering
+	ppu_off();
+
+	STATE = ST_SCOREBOARD;
+	music_play(0);
+
+	// Load nametable for title screen
+	vram_adr(NAMETABLE_A);
+	vram_unrle(gameover);
+
+	// Set text area to update buffer
+	set_vram_update(uListGameOver);
+	
+	// Set normal brightness
+	pal_bright(4);
+
+	// Load palette for sprites
+	pal_spr(spritePalette);
+	pal_bg(spritePalette);
+
+	// Turn on rendering
+	ppu_on_all();
+}
+
 #define PLAYER_SHOOT(){\
 	for(i = 0; i < BULLET_MAX; i++){\
 		if(!BULLET_ALIVE[i]){\
@@ -469,7 +505,7 @@ void setGameState(){
 void main(void)
 {
 	// Frame counter for game logic
-	unsigned int frame = 0;
+	unsigned char frame = 0;
 	
 	// Shared iterative register I
 	unsigned char i = 0;
@@ -494,6 +530,7 @@ void main(void)
 	unsigned char tmp = 0;
 	unsigned char tmp1 = 0;
 	unsigned char tmp2 = 0;
+	unsigned int intmp = 0;
 
 	unsigned char bright_effect = 4;
 	unsigned char fsprite = 0x74;
@@ -555,7 +592,7 @@ void main(void)
 				}
 
 				break;
-				// Do instructions menu stuff (just wait for player input)
+			// Scenario Screen :	
 			case ST_SCENARIO:
 				pad=pad_trigger(PLAYER_ONE); // PAD for player 1
 				
@@ -579,6 +616,42 @@ void main(void)
 				put_str_ubuffer(uScenarioText, sentences[currentText], 27);
 
 				break;
+			// Game over screen :		
+			case ST_SCOREBOARD:
+				pad=pad_trigger(PLAYER_ONE); // PAD for player 1
+				
+				if(intmp < SCORE){
+					sfx_play(0,0);
+					if(intmp < 15){
+						if(frame%6 == 0){
+							intmp++;
+						}
+					}else if(intmp < 40){
+						if(frame%4 == 0){
+							intmp++;
+						}
+					}else if(intmp < 80){
+						if(frame%2 == 0){
+							intmp++;
+						}
+					}else{
+						intmp+=2;
+						if(intmp > SCORE){
+							intmp = SCORE;
+						}
+					}
+				}else{
+					if(pad & PAD_START){
+						setMenuState();
+					}else {
+						input_dampener=0;
+					}
+				}
+				uListGameOver[10] = 0x10+intmp/100;
+				uListGameOver[11] = 0x10+intmp/10%10;
+				uListGameOver[12] = 0x10+intmp%10;
+				break;
+			// Game loop logic below :		
 			case ST_GAME:
 
 				if(frame%6 == 0){
@@ -595,7 +668,8 @@ void main(void)
 						pal_bright(bright_effect);
 						if(bright_effect == 4){
 							if(NPC_HP == 0 || PLAYER_HP == 0){
-								setMenuState();
+								intmp = 0;
+								setGameOverState();
 							}
 						}
 					}else{
@@ -846,8 +920,5 @@ void main(void)
 		}
 
 		frame++;
-		if(frame > 0xFF){
-			frame = 0x00;
-		}
 	}
 }
