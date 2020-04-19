@@ -309,12 +309,14 @@ void setGameState(){
 	ppu_off();
 
 	STATE = ST_GAME;
-	PLAYER_X_POS = 15*8;
+	PLAYER_X_POS = 14*8;
 	PLAYER_Y_POS = 15*8;
 	PLAYER_HP = 3;
 	NPC_X_POS = 16*8;
 	NPC_Y_POS = 15*8;
 	NPC_HP = 3;
+	PLAYER_DIRECTION = DIR_DOWN;
+
 	if(MUSIC_ON){
 		music_play(0);
 	}
