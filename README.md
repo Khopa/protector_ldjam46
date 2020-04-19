@@ -60,3 +60,12 @@ I'd like to thanks :
 * Anyone that is going to play and rate this game during the competion
 * ...
 * AND all the people fighting the pandemic while i'm at home making silly games !
+
+### How to build
+
+Download CC65 from here[ftp://ftp.musoftware.de/pub/uz/cc65/]
+Unpack it somewhere and add bin folder to path.
+
+Run _compile.bat to build protector.
+
+Important: This will only compile with CC65 **v2.13.3.**
