@@ -35,7 +35,7 @@ If you do not want to install an emulator, you can just go to https://jsnes.org/
 
 ### How was it made
 
-**Library :**
+**Libraries :**
 
 * Shiru's neslib
 * Shiru's famitone2
@@ -63,7 +63,7 @@ I'd like to thanks :
 
 ### How to build
 
-Download CC65 from here[ftp://ftp.musoftware.de/pub/uz/cc65/]
+Download CC65 from [here](ftp://ftp.musoftware.de/pub/uz/cc65/)
 Unpack it somewhere and add bin folder to path.
 
 Run _compile.bat to build protector.
