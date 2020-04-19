@@ -1,6 +1,8 @@
 
 # PROTECTOR
 
+![Title Screen](/screens/title.png?raw=true "Title Screen")
+
 A Ludum Dare 46 game jam compo entry. April 2020.
 
 **THEME :** *KEEP IT ALIVE*
@@ -13,6 +15,8 @@ A Ludum Dare 46 game jam compo entry. April 2020.
 
 This a 1-player Arcade action game.
 You are a hero, with your antivirus gun, you must destroy the incoming viruses, survive and protect the nurse in an hospital.
+
+![Game](/screens/gameplay.png?raw=true "Game")
 
 ### Controls
 
