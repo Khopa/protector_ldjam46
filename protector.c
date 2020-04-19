@@ -1,9 +1,14 @@
 /**
  * 
- * LUDUM DARE 46 - AVOIDERS
+ * LUDUM DARE 46 - PROTECTOR
  * By Khopa
  * 
- * Using Shiru's NESLIB
+ * Using Shiru's NESLIB and Famitone2
+ * 
+ * Diclaimer :
+ * - Code is messy, due to time limit and platform constraints.
+ * - I'm relying on multiline macros instead of functions whenever i can, to save CPU cycle on function calls.
+ * - Some static variable are shared to avoid defining too many of them.
  * 
  */
 
@@ -45,9 +50,9 @@
 // 64 sprites is the max the NES can handle
 // -> 2 sprite for player
 // -> 2 for NPC to protect
-// -> 16 for enemy objects
-// -> 10 for player gun bullets
-// -> 1 for bonuses
+// -> 10 for enemy objects
+// -> 4 for player gun bullets
+// -> 1 for bonuses [NOT DONE]
 // -> 9 for blood special effects
 #define ENEMY_MAX 10
 #define BULLET_MAX 4
@@ -64,6 +69,8 @@
 
 // PAD Management
 static unsigned char pad;
+
+// Game State
 static unsigned int STATE;
 
 // SCORE 
@@ -100,12 +107,13 @@ static char BLOOD_DY[BLOOD_MAX];
 static unsigned char BLOOD_SPRITE[BLOOD_MAX];
 static unsigned char BLOOD_LIVE[BULLET_MAX];
 
-// ENEMY
+// ENEMY OBJECTS
 static int ENEMY_X[ENEMY_MAX];
 static int ENEMY_Y[ENEMY_MAX];
 static int ENEMY_DX[ENEMY_MAX];
 static int ENEMY_DY[ENEMY_MAX];
 static unsigned char ENEMY_HP[ENEMY_MAX];
+static unsigned char MUSIC_ON = 1;
 
 // Score board nametable vram update list
 const unsigned char updateListData[8] ={
@@ -129,20 +137,20 @@ static unsigned char uScenarioText[31] ={
 };
 
 // Game Over 'HUD' vram update buffer
-static unsigned char uListGameOver[26] ={
+static unsigned char uListGameOver[14] ={
 	MSB(NTADR_A(11,14))|NT_UPD_HORZ,LSB(NTADR_A(11,14)),10,  // AT BG position 11,14, UPDATE 10 TILES
 	0x33,0x23,0x2F,0x32,0x25,0x1A,  // 'S' 'C' 'O' 'R' 'E' ':'
-	0x00,0x10,0x10,0x10,            // '0' '0' '0'
+	0x00,0x10,0x10,0x10,  // '0' '0' '0'
 	NT_UPD_EOF
 };
 
 // Game 'HUD' vram update buffer
-static unsigned char uListHUD[26] ={
-	MSB(NTADR_A(2,2))|NT_UPD_HORZ,LSB(NTADR_A(2,2)),22,  // AT BG position 3,3, UPDATE 22 TILES
+static unsigned char uListHUD[28] ={
+	MSB(NTADR_A(2,2))|NT_UPD_HORZ,LSB(NTADR_A(2,2)),24,  // AT BG position 3,3, UPDATE 22 TILES
 	0x46,0,0x7C,0x7D,0x7E,0,        // PLAYER HEAD (46), 3 TILE GAUGE
 	0x69,0,0x7C,0x7D,0x7E,0,        // NPC HEAD (69), 3 TILE GAUGE
 	0x33,0x23,0x2F,0x32,0x25,0x1A,  // 'S' 'C' 'O' 'R' 'E' ':'
-	0x00,0x10,0x10,0x10,            // '0' '0' '0'
+	0x00,0x10,0x10,0x10,0x00,0x4D,  // '0' '0' '0'  ' ' 'MUSIC_SPRITE'
 	NT_UPD_EOF
 };
 
@@ -306,7 +314,9 @@ void setGameState(){
 	NPC_X_POS = 16*8;
 	NPC_Y_POS = 15*8;
 	NPC_HP = 3;
-	music_play(0);
+	if(MUSIC_ON){
+		music_play(0);
+	}
 
 	// Load nametable for title screen
 	vram_adr(NAMETABLE_A);
@@ -352,6 +362,20 @@ void setGameOverState(){
 	// Turn on rendering
 	ppu_on_all();
 }
+
+#define TOGGLE_MUSIC(){\
+	if(MUSIC_ON == 1){\
+		MUSIC_ON = 0;\
+		if(STATE == ST_GAME){\
+			music_stop();\
+		}\
+	}else{\
+		if(STATE == ST_GAME){\
+			music_play(0);\
+		}\
+		MUSIC_ON = 1;\
+	}\
+}\
 
 #define PLAYER_SHOOT(){\
 	for(i = 0; i < BULLET_MAX; i++){\
@@ -497,6 +521,11 @@ void setGameOverState(){
 	uListHUD[22] = 0x10+SCORE/100;\
 	uListHUD[23] = 0x10+SCORE/10%10;\
 	uListHUD[24] = 0x10+SCORE%10;\
+	if(MUSIC_ON){\
+		uListHUD[26] = 0x4D;\
+	}else{\
+		uListHUD[26] = 0x5D;\
+	}\
 };
 
 /**
@@ -588,6 +617,8 @@ void main(void)
 				if(pad & PAD_START){
 					setGameState();
 					sfx_play(1,0);
+				}else if(pad&PAD_SELECT){
+					TOGGLE_MUSIC();
 				}else {
 					input_dampener=0;
 				}
@@ -612,9 +643,14 @@ void main(void)
 
 				if(pad&PAD_START || pad & PAD_A){
 					input_dampener=64;
+				}else if(pad&PAD_SELECT && input_dampener == 0){
+					input_dampener=64;
+					TOGGLE_MUSIC();
 				}else{
 					input_dampener=0;
 				}
+
+				
 
 				put_str_ubuffer(uScenarioText, sentences[currentText], 27);
 
@@ -650,6 +686,11 @@ void main(void)
 						input_dampener=0;
 					}
 				}
+
+				if(pad&PAD_SELECT){
+					TOGGLE_MUSIC();
+				}
+
 				uListGameOver[10] = 0x10+intmp/100;
 				uListGameOver[11] = 0x10+intmp/10%10;
 				uListGameOver[12] = 0x10+intmp%10;
@@ -703,6 +744,11 @@ void main(void)
 				}    
 				if(pad&PAD_DOWN){
 					PLAYER_Y_POS = PLAYER_Y_POS+tmp; PLAYER_DIRECTION = DIR_DOWN;
+				}
+
+				if(pad&PAD_SELECT && input_dampener == 0){
+					TOGGLE_MUSIC();
+					input_dampener = 12;
 				}
 
 				// Fire
