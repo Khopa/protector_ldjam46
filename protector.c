@@ -620,6 +620,7 @@ void main(void)
 				if(pad & PAD_START){
 					setGameState();
 					sfx_play(1,0);
+					input_dampener=24;
 				}else if(pad&PAD_SELECT){
 					TOGGLE_MUSIC();
 				}else {
@@ -746,7 +747,19 @@ void main(void)
 
 				if(frame == 255){
 					SPAWN_ENEMY();
-				}
+				} else if(SCORE > 15){
+					if(frame == 128){
+						SPAWN_ENEMY();
+					}
+				} else if(SCORE > 35){
+					if(frame == 64){
+						SPAWN_ENEMY();
+					}
+				} else if(SCORE > 50){
+					if(frame == 172){
+						SPAWN_ENEMY();
+					}
+				}	
 
 				if(input_dampener > 0) input_dampener--;
 				pad=pad_poll(PLAYER_ONE); // PAD for player 1
