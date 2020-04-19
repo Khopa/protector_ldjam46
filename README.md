@@ -14,6 +14,14 @@ A Ludum Dare 46 game jam compo entry. April 2020.
 This a 1-player Arcade action game.
 You are a hero, with your antivirus gun, you must destroy the incoming viruses, survive and protect the nurse in an hospital.
 
+### Controls
+
+* Hold A to run
+* Press B to shoot
+* Use D-PAD to move around
+* Press SELECT to toggle the music if it annoys you
+* Press START to pause the game
+
 ### How to run
 
 Download .nes ROM. Open it in your favorite NES emulator. 
