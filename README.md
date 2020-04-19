@@ -1,2 +1,7 @@
-# protector_ldjam46
-Protector, an NES game. LDJAM46 entry.
+
+PROTECTOR :
+===========
+
+A Ludum Dare 46 game jam entry.
+
+**THEME :** *KEEP IT ALIVE*
