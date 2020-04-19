@@ -897,7 +897,7 @@ void main(void)
 						}
 						if(BULLET_Y[i] < TOP){
 							BULLET_ALIVE[i] = 0;
-						}else if(BULLET_Y[i] > BOT){
+						}else if(BULLET_Y[i] > BOT + 8){
 							BULLET_ALIVE[i] = 0;
 						}
 
