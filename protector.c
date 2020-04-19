@@ -331,9 +331,9 @@ void setGameOverState(){
 
 	// Turn off rendering
 	ppu_off();
-
+	
 	STATE = ST_SCOREBOARD;
-	music_play(0);
+	music_stop();
 
 	// Load nametable for title screen
 	vram_adr(NAMETABLE_A);
@@ -356,7 +356,7 @@ void setGameOverState(){
 #define PLAYER_SHOOT(){\
 	for(i = 0; i < BULLET_MAX; i++){\
 		if(!BULLET_ALIVE[i]){\
-			sfx_play(3,0);\
+			sfx_play(4,0);\
 			switch(PLAYER_DIRECTION){\
 				case DIR_UP:\
 					BULLET_X[i] = PLAYER_X_POS;\
@@ -556,7 +556,7 @@ void main(void)
 				if(pad&PAD_START){
 					if(input_dampener == 0){
 						input_dampener = 64;
-						sfx_play(0,0);
+						sfx_play(1,0);
 						put_str_ubuffer(uListPressStart, "           ", 16);	
 						setScenarioState();	
 					}
@@ -587,6 +587,7 @@ void main(void)
 				
 				if(pad & PAD_START){
 					setGameState();
+					sfx_play(1,0);
 				}else {
 					input_dampener=0;
 				}
@@ -600,8 +601,10 @@ void main(void)
 					if(input_dampener == 0){
 						if(currentText >= SCENARIO_LENGTH){
 							currentText = 0;
+							sfx_play(1,0);
 							setInstructionsState();
 						}else{
+							sfx_play(2,0);
 							currentText ++;
 						}
 					}
@@ -621,7 +624,7 @@ void main(void)
 				pad=pad_trigger(PLAYER_ONE); // PAD for player 1
 				
 				if(intmp < SCORE){
-					sfx_play(0,0);
+					sfx_play(2,0);
 					if(intmp < 15){
 						if(frame%6 == 0){
 							intmp++;
