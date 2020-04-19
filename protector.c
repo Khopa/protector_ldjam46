@@ -114,6 +114,7 @@ static int ENEMY_DX[ENEMY_MAX];
 static int ENEMY_DY[ENEMY_MAX];
 static unsigned char ENEMY_HP[ENEMY_MAX];
 static unsigned char MUSIC_ON = 1;
+static unsigned char PAUSED = 0;
 
 // Score board nametable vram update list
 const unsigned char updateListData[8] ={
@@ -698,6 +699,24 @@ void main(void)
 			// Game loop logic below :		
 			case ST_GAME:
 
+				if(PAUSED){
+					pad=pad_poll(PLAYER_ONE); // PAD for player 1
+					pal_bright(3);
+					if(pad&PAD_START && input_dampener == 0){
+						PAUSED = 0;
+						input_dampener = 12;
+						pal_bright(4);
+						if(MUSIC_ON == 1){
+							music_play(0);
+						}
+					}else{
+						if(input_dampener > 0){
+							input_dampener--;
+						}
+						break;
+					}
+				}
+
 				if(frame%6 == 0){
 					if(fsprite == 0x74){
 						fsprite = 0x75;
@@ -749,6 +768,15 @@ void main(void)
 				if(pad&PAD_SELECT && input_dampener == 0){
 					TOGGLE_MUSIC();
 					input_dampener = 12;
+				}
+
+				if(pad&PAD_START && input_dampener == 0){
+					PAUSED = 1;
+					input_dampener = 12;
+					sfx_play(2,0);
+					if(MUSIC_ON){
+						music_stop();
+					}
 				}
 
 				// Fire
