@@ -9,7 +9,9 @@ A Ludum Dare 46 game jam compo entry. April 2020.
 
 **Platform :** Nintendo Entertainment System \[NES\]
 
-**Language : C** *(ASM source were either generated (sounds effects), or are library, i did not write them.)*
+**Language : C** *(ASM source in this repo were either generated (sounds effects), or are library required for building the project.)*
+
+![Box Art](/screens/boxart.png?raw=true "Box Art")
 
 ### Description
 
@@ -20,7 +22,7 @@ You are a hero, with your antivirus gun, you must destroy the incoming viruses, 
 
 ### Controls
 
-* Hold A to run
+* Hold A to strafe
 * Press B to shoot
 * Use D-PAD to move around
 * Press SELECT to toggle the music if it annoys you
