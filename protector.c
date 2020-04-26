@@ -15,47 +15,43 @@
 // NES Library
 #include "neslib.h"
 
-// Sprite definitions
-#include "sprites.h"
-
-// RAW NAMETABLE DATA
+// Nametables data
 #include "title.h"
 #include "scenario.h"
 #include "instructions.h"
 #include "gameover.h"
 #include "map1.h"
 
+// Constants definition
 #define PLAYER_ONE 0x00
 
-#define ST_MENU  0x00
-#define ST_GAME  0x01
-#define ST_INSTRUCTIONS  0x02
+// Game states
+#define ST_MENU 0x00
+#define ST_GAME 0x01
+#define ST_INSTRUCTIONS 0x02
 #define ST_SCOREBOARD 0x03
 #define ST_SCENARIO 0x04
 
+// Screen Size
 #define SCREEN_X_SIZE 256
 #define SCREEN_Y_SIZE 240
+#define TILE_SIZE 8
+#define TILE_SIZE_DOUBLE 16
+#define TILE_SIZE_HALF 4
 
-#define TOP 8*8
-#define BOT 27*8
-#define LEF 1*8
-#define RIG 30*8
+#define TOP 8*TILE_SIZE
+#define BOT 27*TILE_SIZE
+#define LEF 1*TILE_SIZE
+#define RIG 30*TILE_SIZE
 
-#define NPC_TOP 12*8
-#define NPC_BOT 22*8
-#define NPC_LEF 6*8
-#define NPC_RIG 25*8
+#define NPC_TOP 12*TILE_SIZE
+#define NPC_BOT 22*TILE_SIZE
+#define NPC_LEF 6*TILE_SIZE
+#define NPC_RIG 25*TILE_SIZE
 
-
-// 64 sprites is the max the NES can handle
-// -> 2 sprite for player
-// -> 2 for NPC to protect
-// -> 10 for enemy objects
-// -> 4 for player gun bullets
-// -> 1 for bonuses [NOT DONE]
-// -> 9 for blood special effects
+#define BULLET_SPEED 3
 #define ENEMY_MAX 10
-#define BULLET_MAX 4
+#define BULLET_MAX 5
 #define BLOOD_MAX 9
 #define SCENARIO_LENGTH 8
 
@@ -65,21 +61,50 @@
 #define DIR_RIGHT 2
 #define DIR_DOWN 3
 
+// Palette for sprites
 #define PLAYER_BULLET_PAL 0
+#define BLOOD_PAL 3
+#define BLOOD_EFFECT_DURATION 12
 
-// PAD Management
-static unsigned char pad;
+// Sprites addresses in CHR bank
+#define SPRITE_EMPTY 0x00
+#define SPRITE_MUSIC_ON 0x4D
+#define SPRITE_MUSIC_OFF 0x5D
+#define SPRITE_PLAYER_UP 0x48
+#define SPRITE_PLAYER_DOWN 0x46
+#define SPRITE_PLAYER_RIGHT 0x47
+#define SPRITE_NPC_UP 0x6B
+#define SPRITE_NPC_DOWN 0x69
+#define SPRITE_NPC_RIGHT 0x6A
+#define SPRITE_GAUGE_0_FILLED 0x7C
+#define SPRITE_GAUGE_1_FILLED 0x7D
+#define SPRITE_GAUGE_2_FILLED 0x7E
+#define SPRITE_GAUGE_0_EMPTY 0x6C
+#define SPRITE_GAUGE_1_EMPTY 0x6D
+#define SPRITE_GAUGE_2_EMPTY 0x6E
+#define SPRITE_BLOOD_EFFECT_0 0x43
+#define SPRITE_BLOOD_EFFECT_1 0x44
+#define SPRITE_BLOOD_EFFECT_2 0x53
+#define SPRITE_BLOOD_EFFECT_3 0x54
+
+// ZEROPAGE variables (frequently accessed)
+// Note to self : Do not try to initialize zeropage variables.
+#pragma bssseg(push,"ZEROPAGE")
+static unsigned char PLAYER_X_POS;
+static unsigned char PLAYER_Y_POS;
+static unsigned char PLAYER_HP;
+static unsigned int SCORE;
+static unsigned char BULLET_X[BULLET_MAX];
+static unsigned char BULLET_Y[BULLET_MAX];
+#pragma bssseg(pop)
 
 // Game State
 static unsigned int STATE;
 
-// SCORE 
-static unsigned int SCORE = 0;
+// PAD Management
+static unsigned char pad;
 
 // PLAYER OBJECT
-static unsigned char   PLAYER_X_POS = 0;
-static unsigned char   PLAYER_Y_POS = 0;
-static unsigned char   PLAYER_HP;
 static unsigned char   PLAYER_DIRECTION = DIR_DOWN;
 static unsigned char   PLAYER_FLAGS = 0;
 static unsigned char   PLAYER_PALETTE = 0;
@@ -93,8 +118,6 @@ static unsigned char   NPC_FLAGS = 0;
 static unsigned char   NPC_PALETTE = 1;
 
 // PLAYER BULLETS
-static unsigned char BULLET_X[BULLET_MAX];
-static unsigned char BULLET_Y[BULLET_MAX];
 static char BULLET_DX[BULLET_MAX];
 static char BULLET_DY[BULLET_MAX];
 static unsigned char BULLET_ALIVE[BULLET_MAX];
@@ -116,11 +139,6 @@ static unsigned char ENEMY_HP[ENEMY_MAX];
 static unsigned char MUSIC_ON = 1;
 static unsigned char PAUSED = 0;
 
-// Score board nametable vram update list
-const unsigned char updateListData[8] ={
-	MSB(NTADR_A(12,2))|NT_UPD_HORZ,LSB(NTADR_A(12,2)),4,0,0,0,0,NT_UPD_EOF
-};
-
 // 'PRESS START' vram update buffer
 static unsigned char uListPressStart[17] ={
 	MSB(NTADR_A(10,14))|NT_UPD_HORZ,LSB(NTADR_A(10,14)),13,0,0,0,0,0,0,0,0,0,0,0,0,0,NT_UPD_EOF
@@ -139,7 +157,7 @@ static unsigned char uScenarioText[31] ={
 
 // Game Over 'HUD' vram update buffer
 static unsigned char uListGameOver[14] ={
-	MSB(NTADR_A(11,14))|NT_UPD_HORZ,LSB(NTADR_A(11,14)),10,  // AT BG position 11,14, UPDATE 10 TILES
+	MSB(NTADR_A(11,14))|NT_UPD_HORZ,LSB(NTADR_A(11,14)),10,  // AT BG position 11,14, UPDATE 10 TILES HORIZONTALLY
 	0x33,0x23,0x2F,0x32,0x25,0x1A,  // 'S' 'C' 'O' 'R' 'E' ':'
 	0x00,0x10,0x10,0x10,  // '0' '0' '0'
 	NT_UPD_EOF
@@ -147,11 +165,11 @@ static unsigned char uListGameOver[14] ={
 
 // Game 'HUD' vram update buffer
 static unsigned char uListHUD[28] ={
-	MSB(NTADR_A(2,2))|NT_UPD_HORZ,LSB(NTADR_A(2,2)),24,  // AT BG position 3,3, UPDATE 22 TILES
-	0x46,0,0x7C,0x7D,0x7E,0,        // PLAYER HEAD (46), 3 TILE GAUGE
-	0x69,0,0x7C,0x7D,0x7E,0,        // NPC HEAD (69), 3 TILE GAUGE
+	MSB(NTADR_A(2,2))|NT_UPD_HORZ,LSB(NTADR_A(2,2)),24,  // AT BG position 2,2, UPDATE 24 TILES HORIZONTALLY
+	SPRITE_PLAYER_DOWN,SPRITE_EMPTY,SPRITE_GAUGE_0_FILLED,SPRITE_GAUGE_1_FILLED,SPRITE_GAUGE_2_FILLED,SPRITE_EMPTY,        // PLAYER HEAD (46), 3 TILE GAUGE
+	SPRITE_NPC_DOWN,SPRITE_EMPTY,SPRITE_GAUGE_0_FILLED,SPRITE_GAUGE_1_FILLED,SPRITE_GAUGE_2_FILLED,SPRITE_EMPTY,        // PLAYER HEAD (46), 3 TILE GAUGE
 	0x33,0x23,0x2F,0x32,0x25,0x1A,  // 'S' 'C' 'O' 'R' 'E' ':'
-	0x00,0x10,0x10,0x10,0x00,0x4D,  // '0' '0' '0'  ' ' 'MUSIC_SPRITE'
+	SPRITE_EMPTY,0x10,0x10,0x10,SPRITE_EMPTY,SPRITE_MUSIC_ON,  // '0' '0' '0'  ' ' 'MUSIC_SPRITE'
 	NT_UPD_EOF
 };
 
@@ -170,20 +188,6 @@ const static char *sentences[] = {
 	"  YOU ARE OUR ONLY HOPE   ",
 	"  GO AND ERADICATE THEM   "
 };
-
-/**
- * Put a String on the screen
- * adr : location in vram/screen
- * str : string to put
- */
-void put_str(unsigned int adr,const char *str){
-	vram_adr(adr);
-	while(1)
-	{
-		if(!*str) break;
-		vram_put((*str++)-0x20); //-0x20 because ASCII code 0x20 is placed in tile 0 of the CHR sprite sheet
-	}
-}
 
 /**
  * Put a String in the update buffer
@@ -340,7 +344,6 @@ void setGameState(){
 }
 
 void setGameOverState(){
-	char scoreboard[10] = {'S','C','O','R','E',':',' ','0','0','0'};
 
 	// Turn off rendering
 	ppu_off();
@@ -383,31 +386,31 @@ void setGameOverState(){
 #define PLAYER_SHOOT(){\
 	for(i = 0; i < BULLET_MAX; i++){\
 		if(!BULLET_ALIVE[i]){\
-			sfx_play(4,0);\
+			sfx_play(0,0);\
 			switch(PLAYER_DIRECTION){\
 				case DIR_UP:\
 					BULLET_X[i] = PLAYER_X_POS;\
 					BULLET_Y[i] = PLAYER_Y_POS;\
 					BULLET_DX[i] = 0;\
-					BULLET_DY[i] = -4;\
+					BULLET_DY[i] = -BULLET_SPEED;\
 					break;\
 				case DIR_LEFT:\
 					BULLET_X[i] = PLAYER_X_POS;\
-					BULLET_Y[i] = PLAYER_Y_POS + 4;\
-					BULLET_DX[i] = -4;\
+					BULLET_Y[i] = PLAYER_Y_POS + TILE_SIZE_HALF;\
+					BULLET_DX[i] = -BULLET_SPEED;\
 					BULLET_DY[i] = 0;\
 					break;\
 				case DIR_RIGHT:\
 					BULLET_X[i] = PLAYER_X_POS;\
-					BULLET_Y[i] = PLAYER_Y_POS + 4;\
-					BULLET_DX[i] = 4;\
+					BULLET_Y[i] = PLAYER_Y_POS + TILE_SIZE_HALF;\
+					BULLET_DX[i] = BULLET_SPEED;\
 					BULLET_DY[i] = 0;\
 					break;\
 				case DIR_DOWN:\
 					BULLET_X[i] = PLAYER_X_POS;\
 					BULLET_Y[i] = PLAYER_Y_POS;\
 					BULLET_DX[i] = 0;\
-					BULLET_DY[i] = 4;\
+					BULLET_DY[i] = BULLET_SPEED;\
 					break;\
 			}\
 			BULLET_ALIVE[i] = 1;\
@@ -429,11 +432,15 @@ void setGameOverState(){
 		if(BLOOD_LIVE[tmp2] == 0){\
 			BLOOD_X[tmp2] = X_POS;\
 			BLOOD_Y[tmp2] = Y_POS;\
-			tmp = rand8();\
-			BLOOD_DX[tmp2] = tmp > 128 ? -1 : 1;\
-			BLOOD_DY[tmp2] = tmp > 128 ? -1 : 1;\
-			BLOOD_SPRITE[tmp2] = 0x54;\
-			BLOOD_LIVE[tmp2] = 8;\
+			BLOOD_DX[tmp2] = rand8() > 128 ? -1 : 1;\
+			BLOOD_DY[tmp2] = rand8() > 128 ? -1 : 1;\
+			switch(rand8()%4){\
+				case 0: BLOOD_SPRITE[tmp2] = SPRITE_BLOOD_EFFECT_0; break;\
+				case 1: BLOOD_SPRITE[tmp2] = SPRITE_BLOOD_EFFECT_1; break;\
+				case 2: BLOOD_SPRITE[tmp2] = SPRITE_BLOOD_EFFECT_2; break;\
+				case 3: BLOOD_SPRITE[tmp2] = SPRITE_BLOOD_EFFECT_3; break;\
+			}\
+			BLOOD_LIVE[tmp2] = BLOOD_EFFECT_DURATION;\
 			tmp1 = tmp1 + 1;\
 			if(tmp1 == 4) break;\
 		}\
@@ -480,54 +487,54 @@ void setGameOverState(){
 #define HUD_UPDATE(){\
 	switch(PLAYER_HP){\
 		case 3:\
-			uListHUD[5] = 0x7C;\
-			uListHUD[6] = 0x7D;\
-			uListHUD[7] = 0x7E;\
+			uListHUD[5] = SPRITE_GAUGE_0_FILLED;\
+			uListHUD[6] = SPRITE_GAUGE_1_FILLED;\
+			uListHUD[7] = SPRITE_GAUGE_2_FILLED;\
 			break;\
 		case 2:\
-			uListHUD[5] = 0x7C;\
-			uListHUD[6] = 0x7D;\
-			uListHUD[7] = 0x6E;\
+			uListHUD[5] = SPRITE_GAUGE_0_FILLED;\
+			uListHUD[6] = SPRITE_GAUGE_1_FILLED;\
+			uListHUD[7] = SPRITE_GAUGE_2_EMPTY;\
 			break;\
 		case 1:\
-			uListHUD[5] = 0x7C;\
-			uListHUD[6] = 0x6D;\
-			uListHUD[7] = 0x6E;\
+			uListHUD[5] = SPRITE_GAUGE_0_FILLED;\
+			uListHUD[6] = SPRITE_GAUGE_1_EMPTY;\
+			uListHUD[7] = SPRITE_GAUGE_2_EMPTY;\
 			break;\
 		default:\
-			uListHUD[5] = 0x6C;\
-			uListHUD[6] = 0x6D;\
-			uListHUD[7] = 0x6E;\
+			uListHUD[5] = SPRITE_GAUGE_0_EMPTY;\
+			uListHUD[6] = SPRITE_GAUGE_1_EMPTY;\
+			uListHUD[7] = SPRITE_GAUGE_2_EMPTY;\
 	}\
 	switch(NPC_HP){\
 		case 3:\
-			uListHUD[11] = 0x7C;\
-			uListHUD[12] = 0x7D;\
-			uListHUD[13] = 0x7E;\
+			uListHUD[11] = SPRITE_GAUGE_0_FILLED;\
+			uListHUD[12] = SPRITE_GAUGE_1_FILLED;\
+			uListHUD[13] = SPRITE_GAUGE_2_FILLED;\
 			break;\
 		case 2:\
-			uListHUD[11] = 0x7C;\
-			uListHUD[12] = 0x7D;\
-			uListHUD[13] = 0x6E;\
+			uListHUD[11] = SPRITE_GAUGE_0_FILLED;\
+			uListHUD[12] = SPRITE_GAUGE_1_FILLED;\
+			uListHUD[13] = SPRITE_GAUGE_2_EMPTY;\
 			break;\
 		case 1:\
-			uListHUD[11] = 0x7C;\
-			uListHUD[12] = 0x6D;\
-			uListHUD[13] = 0x6E;\
+			uListHUD[11] = SPRITE_GAUGE_0_FILLED;\
+			uListHUD[12] = SPRITE_GAUGE_1_EMPTY;\
+			uListHUD[13] = SPRITE_GAUGE_2_EMPTY;\
 			break;\
 		default:\
-			uListHUD[11] = 0x6C;\
-			uListHUD[12] = 0x6D;\
-			uListHUD[13] = 0x6E;\
+			uListHUD[11] = SPRITE_GAUGE_0_EMPTY;\
+			uListHUD[12] = SPRITE_GAUGE_1_EMPTY;\
+			uListHUD[13] = SPRITE_GAUGE_2_EMPTY;\
 	}\
 	if(SCORE > 999) SCORE = 999;\
 	uListHUD[22] = 0x10+SCORE/100;\
 	uListHUD[23] = 0x10+SCORE/10%10;\
 	uListHUD[24] = 0x10+SCORE%10;\
 	if(MUSIC_ON){\
-		uListHUD[26] = 0x4D;\
+		uListHUD[26] = SPRITE_MUSIC_ON;\
 	}else{\
-		uListHUD[26] = 0x5D;\
+		uListHUD[26] = SPRITE_MUSIC_OFF;\
 	}\
 };
 
@@ -598,11 +605,7 @@ void main(void)
 
 				// Flash press start
 				if(frame%24 == 0){
-					if(blink == 1){
-						blink = 0;
-					}else{
-						blink = 1;
-					}
+					blink^=1;
 				}
 
 				if(blink){
@@ -702,6 +705,9 @@ void main(void)
 			// Game loop logic below :		
 			case ST_GAME:
 
+				pal_spr(spritePalette);
+				pal_bg(bgPalette);
+
 				if(PAUSED){
 					pad=pad_poll(PLAYER_ONE); // PAD for player 1
 					pal_bright(3);
@@ -766,18 +772,21 @@ void main(void)
 
 				// Controlling Player
 				tmp = 2;
-				if(pad&PAD_A) tmp = 4;
+				tmp2 = PLAYER_DIRECTION;
 				if(pad&PAD_LEFT){
-					PLAYER_X_POS = PLAYER_X_POS-tmp; PLAYER_DIRECTION = DIR_LEFT;
+					PLAYER_X_POS = PLAYER_X_POS-tmp; tmp2 = DIR_LEFT;
 				}
 				if(pad&PAD_RIGHT){
-					 PLAYER_X_POS = PLAYER_X_POS+tmp; PLAYER_DIRECTION = DIR_RIGHT;	
+					 PLAYER_X_POS = PLAYER_X_POS+tmp; tmp2 = DIR_RIGHT;	
 				}
 				if(pad&PAD_UP){
-					PLAYER_Y_POS = PLAYER_Y_POS-tmp; PLAYER_DIRECTION = DIR_UP;
+					PLAYER_Y_POS = PLAYER_Y_POS-tmp; tmp2 = DIR_UP;
 				}    
 				if(pad&PAD_DOWN){
-					PLAYER_Y_POS = PLAYER_Y_POS+tmp; PLAYER_DIRECTION = DIR_DOWN;
+					PLAYER_Y_POS = PLAYER_Y_POS+tmp; tmp2 = DIR_DOWN;
+				}
+				if(!(pad&PAD_A)){
+					PLAYER_DIRECTION = tmp2;
 				}
 
 				if(pad&PAD_SELECT && input_dampener == 0){
@@ -845,17 +854,17 @@ void main(void)
 				PLAYER_FLAGS = 0;
 				switch(PLAYER_DIRECTION){
 					case DIR_UP:
-						tmp = 0x48;
+						tmp = SPRITE_PLAYER_UP;
 						break;
 					case DIR_LEFT:
-						tmp = 0x47;
+						tmp = SPRITE_PLAYER_RIGHT;
 						PLAYER_FLAGS = OAM_FLIP_H;
 						break;
 					case DIR_RIGHT:
-						tmp = 0x47;
+						tmp = SPRITE_PLAYER_RIGHT;
 						break;
 					case DIR_DOWN:
-						tmp = 0x46;
+						tmp = SPRITE_PLAYER_DOWN;
 						break;
 				}
 
@@ -869,17 +878,17 @@ void main(void)
 					NPC_FLAGS = 0;
 					switch(NPC_DIRECTION){
 						case DIR_UP:
-							tmp = 0x6B;
+							tmp = SPRITE_NPC_UP;
 							break;
 						case DIR_LEFT:
-							tmp = 0x6A;
+							tmp = SPRITE_NPC_RIGHT;
 							NPC_FLAGS = OAM_FLIP_H;
 							break;
 						case DIR_RIGHT:
-							tmp = 0x6A;
+							tmp = SPRITE_NPC_RIGHT;
 							break;
 						case DIR_DOWN:
-							tmp = 0x69;
+							tmp = SPRITE_NPC_DOWN;
 							break;
 					}
 					spr = oam_spr(NPC_X_POS, NPC_Y_POS, tmp, 4|NPC_FLAGS|NPC_PALETTE, spr);
@@ -888,12 +897,17 @@ void main(void)
 
 				// BLOOD EFFECTS 
 				i = 0;
+				tmp2 = frame%2;
 				for(i = 0; i < BLOOD_MAX; i++){
 					if(BLOOD_LIVE[i] > 0){
 						BLOOD_X[i] = BLOOD_X[i] + BLOOD_DX[i];
 						BLOOD_Y[i] = BLOOD_Y[i] + BLOOD_DY[i];
 						BLOOD_LIVE[i] = BLOOD_LIVE[i] - 1;
-						spr = oam_spr(BLOOD_X[i], BLOOD_Y[i], BLOOD_SPRITE[i], 4|1, spr);
+						if(tmp2){
+							spr = oam_spr(BLOOD_X[i], BLOOD_Y[i], BLOOD_SPRITE[i], 4|3, spr);
+						}else{
+							spr = oam_spr(BLOOD_X[i], BLOOD_Y[i], BLOOD_SPRITE[i], 4|3|OAM_FLIP_H, spr);
+						}
 					}
 				}
 
@@ -910,13 +924,13 @@ void main(void)
 						}
 						if(BULLET_Y[i] < TOP){
 							BULLET_ALIVE[i] = 0;
-						}else if(BULLET_Y[i] > BOT + 8){
+						}else if(BULLET_Y[i] > BOT + TILE_SIZE){
 							BULLET_ALIVE[i] = 0;
 						}
 
 						// Check collision with NPC
-						if(NPC_HP > 0 && BULLET_X[i]+4 > NPC_X_POS && BULLET_X[i]+4 < NPC_X_POS+8){
-							if(BULLET_Y[i]+4 > NPC_Y_POS+8 && BULLET_Y[i]+4 < NPC_Y_POS+16){
+						if(NPC_HP > 0 && BULLET_X[i]+TILE_SIZE_HALF > NPC_X_POS && BULLET_X[i]+TILE_SIZE_HALF < NPC_X_POS+TILE_SIZE){
+							if(BULLET_Y[i]+TILE_SIZE_HALF > NPC_Y_POS+TILE_SIZE && BULLET_Y[i]+TILE_SIZE_HALF < NPC_Y_POS+TILE_SIZE_DOUBLE){
 								sfx_play(1,1);
 								NPC_HP--;
 								bright_effect = 1;
@@ -950,6 +964,7 @@ void main(void)
 				tmp = rand8();
 				for(i = 0; i < ENEMY_MAX; i++){
 					if(ENEMY_HP[i] > 0){
+						
 						if(ENEMY_X[i] < LEF){
 							ENEMY_X[i] = LEF;
 							ENEMY_DX[i] = 2;
@@ -964,6 +979,7 @@ void main(void)
 							ENEMY_Y[i] = BOT + 8;
 							ENEMY_DY[i] = tmp > 128 ? -2 : -1;
 						}
+						
 						ENEMY_X[i] = ENEMY_X[i] + ENEMY_DX[i];
 						ENEMY_Y[i] = ENEMY_Y[i] + ENEMY_DY[i];
 						spr = oam_spr(ENEMY_X[i], ENEMY_Y[i], fsprite, 4|3, spr);
